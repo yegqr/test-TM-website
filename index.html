@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Word‑Cloud Site • Concept</title>
+  <meta name="description" content="Інтерактивний сайт з word‑cloud: клік по слову → глибинний розділ з анімаціями. Вбудований чат‑віджет ChatGPT." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Merriweather:wght@300;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1116; --surface:#151925; --ink:#e9edf6; --muted:#9aa6bf; --line:rgba(255,255,255,.08);
+      --brand:#7c5cff; --brand2:#44d4ff;
+      --policy:#2ecc71; --research:#3498db; --media:#e67e22; --contro:#c0392b;
+      --radius:18px; --shadow:0 14px 36px rgba(0,0,0,.35);
+    }
+    [data-theme="light"]{
+      --bg:#f6f8fd; --surface:#ffffff; --ink:#0f1324; --muted:#5b667d; --line:rgba(0,0,0,.08);
+      --shadow:0 10px 28px rgba(10,20,40,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink); background:
+        radial-gradient(900px 520px at -10% -10%, rgba(124,92,255,.16), transparent),
+        radial-gradient(900px 520px at 110% 0%, rgba(68,212,255,.12), transparent),
+        var(--bg);
+      font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; line-height:1.45;
+    }
+    a{color:inherit}
+    header{
+      position:sticky; top:0; z-index:40;
+      backdrop-filter:blur(10px); background:rgba(0,0,0,.18);
+      border-bottom:1px solid var(--line);
+    }
+    .nav{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:10px}
+    .brand{display:flex;gap:10px;align-items:center}
+    .logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:800;background:conic-gradient(from 180deg,var(--brand),var(--brand2),var(--brand)); box-shadow:var(--shadow)}
+    .nav .links{display:flex;gap:12px;flex-wrap:wrap}
+    .link{padding:8px 10px;border-radius:10px;border:1px solid transparent}
+    .link:hover{border-color:var(--line);background:rgba(255,255,255,.04)}
+    .actions{display:flex;gap:8px}
+    button{appearance:none;border:none;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;cursor:pointer}
+    .primary{background:linear-gradient(90deg,var(--brand),var(--brand2)); color:#0c0f17}
+    main{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    @media (max-width:980px){ main{grid-template-columns:1fr} }
+
+    /* Cloud card */
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .cloudWrap{position:relative;min-height:68vh;display:grid}
+    .legend{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;flex-wrap:wrap;font-size:12px;background:rgba(0,0,0,.18);backdrop-filter:blur(8px);padding:8px 10px;border-radius:12px;border:1px solid var(--line)}
+    .dot{width:10px;height:10px;border-radius:50% ;display:inline-block;margin-right:6px}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0 0}
+    .filters .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02);cursor:pointer;font-weight:700}
+    .filters .pill.active{outline:2px solid var(--brand);outline-offset:-2px}
+
+    /* Details (desktop side panel) */
+    .details{padding:14px;display:flex;flex-direction:column;gap:12px}
+    .heroBox{position:relative;aspect-ratio:16/10;border-radius:14px;border:1px solid var(--line);overflow:hidden;background:rgba(255,255,255,.02)}
+    .heroImg{position:absolute;inset:0;background:url('https://placehold.co/1200x800?text=Image') center/cover no-repeat;transition:transform .6s ease}
+    .overlayText{position:absolute;inset:auto 0 0 0;background:linear-gradient(to top, rgba(0,0,0,.45), transparent);color:#fff;padding:10px 12px;font-weight:700}
+    .flipNote{font-size:12px;color:var(--muted)}
+    h1,h2,h3{font-family:Merriweather,serif;letter-spacing:.2px}
+    h1{font-size:36px;margin:0}
+    .muted{color:var(--muted)}
+    .list{display:grid;gap:10px}
+    .item{padding:12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+
+    /* Mobile full-screen sheet for details */
+    .sheet{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;z-index:50}
+    .sheet.open{display:flex}
+    .sheet .panel{background:var(--surface);border-radius:18px 18px 0 0;border:1px solid var(--line);box-shadow:var(--shadow);width:100%;max-height:88vh;overflow:auto;transform:translateY(4%);animation:pop .35s ease both}
+    @keyframes pop{from{transform:translateY(8%);opacity:0}to{transform:translateY(0);opacity:1}}
+    .sheetHeader{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--line)}
+    .flipWrap{perspective:1000px}
+    .flip{position:relative;height:220px;transform-style:preserve-3d;transition:transform .6s}
+    .flip .front,.flip .back{position:absolute;inset:0;border-radius:14px;border:1px solid var(--line);backface-visibility:hidden;overflow:hidden}
+    .flip .front{background:url('https://placehold.co/1000x700?text=Tap+to+flip') center/cover}
+    .flip .back{background:rgba(255,255,255,.02);transform:rotateY(180deg);display:flex;align-items:center;justify-content:center;padding:16px}
+    .flip.flipped{transform:rotateY(180deg)}
+    .sheetBody{padding:12px}
+    .chip{display:inline-flex;gap:6px;align-items:center;padding:5px 10px;border:1px solid var(--line);border-radius:999px;margin-right:6px}
+
+    /* Zoom transition helper */
+    .zoomGhost{position:fixed;z-index:60;pointer-events:none;will-change:transform,opacity}
+
+    /* Chat widget */
+    .chatBtn{position:fixed;right:16px;bottom:16px;z-index:60;background:linear-gradient(90deg,var(--brand),var(--brand2));color:#0c0f17;border:none;border-radius:999px;padding:12px 14px;font-weight:800;box-shadow:var(--shadow);cursor:pointer}
+    .chat{position:fixed;right:16px;bottom:76px;width:360px;max-height:60vh;display:none;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;z-index:60}
+    .chat.open{display:flex}
+    .chatHead{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--line)}
+    .chatBody{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+    .msg{padding:10px 12px;border-radius:12px;max-width:80%}
+    .me{align-self:flex-end;background:rgba(124,92,255,.18);border:1px solid rgba(124,92,255,.35)}
+    .ai{align-self:flex-start;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+    .chatForm{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+    .chatForm input{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--ink)}
+    @media (max-width:520px){
+      .chat{right:8px;left:8px;width:auto;max-height:70vh}
+      .chatBtn{right:8px;bottom:12px}
+    }
+
+    .sr{position:absolute;left:-9999px}
+  </style>
+</head>
+<body data-theme="dark">
+  <header>
+    <div class="nav">
+      <div class="brand">
+        <div class="logo">WC</div>
+        <div>
+          <div style="font-weight:800">Word‑Cloud Concept</div>
+          <div class="muted" style="font-size:12px">клік по слову → глибинний розділ</div>
+        </div>
+      </div>
+      <div class="links">
+        <a class="link" href="#cloud">Cloud</a>
+        <a class="link" href="#sections">Розділи</a>
+      </div>
+      <div class="actions">
+        <button id="themeBtn">🌓 Тема</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left: Word Cloud -->
+    <section id="cloud" class="card cloudWrap">
+      <svg id="cloudSvg" role="img" aria-label="Інтерактивний word‑cloud"></svg>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--policy)"></i>Політика</span>
+        <span><i class="dot" style="background:var(--research)"></i>Дослідження</span>
+        <span><i class="dot" style="background:var(--media)"></i>Медіа</span>
+        <span><i class="dot" style="background:var(--contro)"></i>Дебати</span>
+      </div>
+      <div class="filters" id="filters" style="position:absolute;right:12px;bottom:12px"></div>
+    </section>
+
+    <!-- Right: Details (desktop) -->
+    <aside class="card details" id="details">
+      <div>
+        <h1 id="dTitle">Обери тему на вордклауді</h1>
+        <div class="muted" id="dKicker">Клікни/тапни слово — побачиш плавний перехід та контент.</div>
+      </div>
+      <div class="heroBox">
+        <div class="heroImg" id="heroImg"></div>
+        <div class="overlayText" id="heroOverlay">Натисни на зображення — на мобілці воно “перевертається” у текст</div>
+      </div>
+      <div class="flipNote">Підказка: на мобілці цей розділ відкриється як фулскрін‑картка з flip‑анімацією.</div>
+      <div id="dChips"></div>
+      <div class="list" id="dList"></div>
+    </aside>
+  </main>
+
+  <!-- Mobile sheet -->
+  <div class="sheet" id="sheet">
+    <div class="panel">
+      <div class="sheetHeader">
+        <strong id="mTitle">Section</strong>
+        <button id="closeSheet">✕</button>
+      </div>
+      <div class="sheetBody">
+        <div class="flipWrap" style="margin-bottom:10px">
+          <div class="flip" id="flip">
+            <div class="front"></div>
+            <div class="back"><div>Тут текст розділу. Тапни картку ще раз — повернеться зображення.</div></div>
+          </div>
+        </div>
+        <div id="mChips" style="margin-bottom:8px"></div>
+        <div class="list" id="mList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat widget -->
+  <button class="chatBtn" id="chatBtn">💬 Чат</button>
+  <div class="chat" id="chatBox" aria-live="polite">
+    <div class="chatHead">
+      <div><strong>Помічник</strong> <span class="muted" style="font-size:12px">on‑site</span></div>
+      <button id="chatClose">✕</button>
+    </div>
+    <div class="chatBody" id="chatBody">
+      <div class="msg ai">Привіт! Пояснити як працює сайт або розповісти про розділ?</div>
+    </div>
+    <form class="chatForm" id="chatForm">
+      <input id="chatInput" placeholder="Напишіть повідомлення..." autocomplete="off" />
+      <button class="primary" type="submit">▶︎</button>
+    </form>
+  </div>
+
+  <span class="sr" id="voiceTTSEnabled" aria-hidden="true"></span>
+
+  <!-- Libs -->
+  <script src="https://unpkg.com/d3@7"></script>
+  <script src="https://unpkg.com/d3-cloud/build/d3.layout.cloud.js"></script>
+
+  <script>
+    // ------------- Data -------------
+    const CATS = {
+      policy:{name:"Політика", color:getComputedStyle(document.documentElement).getPropertyValue('--policy').trim()},
+      research:{name:"Дослідження", color:getComputedStyle(document.documentElement).getPropertyValue('--research').trim()},
+      media:{name:"Медіа", color:getComputedStyle(document.documentElement).getPropertyValue('--media').trim()},
+      contro:{name:"Дебати", color:getComputedStyle(document.documentElement).getPropertyValue('--contro').trim()},
+    };
+
+    // Слова для хмари (заміни своїми). weight 20..80
+    const WORDS = [
+      {text:"Policy Work", weight:76, cat:"policy", slug:"policy-work"},
+      {text:"KSE", weight:50, cat:"policy", slug:"kse"},
+      {text:"NBU Council", weight:46, cat:"policy", slug:"nbu"},
+      {text:"Research", weight:70, cat:"research", slug:"research"},
+      {text:"Microeconomic Theory", weight:40, cat:"research", slug:"micro"},
+      {text:"Game Theory", weight:44, cat:"research", slug:"games"},
+      {text:"Teaching", weight:52, cat:"research", slug:"teaching"},
+      {text:"Media & Talks", weight:48, cat:"media", slug:"media"},
+      {text:"Public Essays", weight:34, cat:"media", slug:"essays"},
+      {text:"Debates & Q&A", weight:38, cat:"contro", slug:"debates"},
+      {text:"Press Statements", weight:32, cat:"media", slug:"press"},
+    ];
+
+    // Вміст розділів (демо). Замінюй реальними даними.
+    const SECTIONS = {
+      "policy-work":{
+        title:"Policy Work",
+        img:"https://placehold.co/1200x800/111214/FFFFFF?text=Policy+Work",
+        tags:["політика","економіка"],
+        blocks:[
+          {title:"Роль і фокус", text:"Опис впливу на економічну політику, незалежність інституцій, ринковий дизайн."},
+          {title:"Приклади", text:"Окремі кейси/проєкти з короткими висновками (можна лінки)."}
+        ]
+      },
+      "kse":{
+        title:"KSE",
+        img:"https://placehold.co/1200x800/121522/FFFFFF?text=KSE",
+        tags:["освіта","аналітика"],
+        blocks:[
+          {title:"Програми", text:"Освітні й дослідницькі ініціативи, партнерства, гуманітарні проєкти."}
+        ]
+      },
+      "nbu":{
+        title:"NBU Council",
+        img:"https://placehold.co/1200x800/141822/FFFFFF?text=NBU",
+        tags:["центральний банк","монетарна політика"],
+        blocks:[
+          {title:"Огляд", text:"Короткий опис участі в Раді НБУ та фокуси роботи."}
+        ]
+      },
+      "research":{
+        title:"Research",
+        img:"https://placehold.co/1200x800/16202b/FFFFFF?text=Research",
+        tags:["мікро","теорія ігор"],
+        blocks:[
+          {title:"Теми", text:"Мікроекономічна теорія, контракти, інституційний дизайн."},
+          {title:"Посилання", text:"Google Scholar / SSRN."}
+        ]
+      },
+      "micro":{title:"Microeconomic Theory", img:"https://placehold.co/1200x800/1b2430/FFFFFF?text=Micro", tags:["мікро"], blocks:[{title:"Огляд", text:"Опис напряму / курси / публікації."}]},
+      "games":{title:"Game Theory", img:"https://placehold.co/1200x800/1e2a38/FFFFFF?text=Game+Theory", tags:["теорія ігор"], blocks:[{title:"Огляд", text:"Стисла довідка + кейси."}]},
+      "teaching":{title:"Teaching", img:"https://placehold.co/1200x800/202d3d/FFFFFF?text=Teaching", tags:["курси"], blocks:[{title:"Курси", text:"Силлабуси, відеолекції, матеріали."}]},
+      "media":{title:"Media & Talks", img:"https://placehold.co/1200x800/243346/FFFFFF?text=Media+%26+Talks", tags:["медіа"], blocks:[{title:"Виступи", text:"Публічні лекції, інтерв'ю, подкасти."}]},
+      "essays":{title:"Public Essays", img:"https://placehold.co/1200x800/283a52/FFFFFF?text=Essays", tags:["есе"], blocks:[{title:"Добірка", text:"Колонки/есе з лінками."}]},
+      "debates":{title:"Debates & Q&A", img:"https://placehold.co/1200x800/2c405b/FFFFFF?text=Debates", tags:["Q&A"], blocks:[{title:"Правила", text:"Відповіді на часті запитання, позиції, аргументи."}]},
+      "press":{title:"Press Statements", img:"https://placehold.co/1200x800/304766/FFFFFF?text=Press", tags:["прес-служба"], blocks:[{title:"Офіційні заяви", text:"Лаконічні пояснення із датами та джерелами."}]},
+    };
+
+    // ------------- Theme -------------
+    const themeBtn = document.getElementById('themeBtn');
+    const savedTheme = localStorage.getItem('wc_theme') || 'dark';
+    document.body.setAttribute('data-theme', savedTheme);
+    themeBtn.onclick = ()=> {
+      const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', next);
+      localStorage.setItem('wc_theme', next);
+      redrawCloud(); // кольори можуть змінитись
+    };
+
+    // ------------- Cloud (desktop + mobile) -------------
+    const svg = d3.select('#cloudSvg');
+    let layout, g;
+    let activeCats = new Set(Object.keys(CATS));
+
+    // Pills-фільтри
+    const filters = document.getElementById('filters');
+    Object.entries(CATS).forEach(([id,cat])=>{
+      const pill = document.createElement('button');
+      pill.className = 'pill active';
+      pill.textContent = cat.name;
+      pill.onclick = ()=>{
+        if(activeCats.has(id)){ activeCats.delete(id); pill.classList.remove('active'); }
+        else{ activeCats.add(id); pill.classList.add('active'); }
+        redrawCloud();
+      };
+      filters.appendChild(pill);
+    });
+
+    function redrawCloud(){
+      // Розмір
+      const wrap = document.querySelector('.cloudWrap');
+      const w = wrap.clientWidth, h = Math.max(440, wrap.clientHeight);
+      svg.attr('width', w).attr('height', h).html(''); // clear
+      g = svg.append('g').attr('transform', `translate(${w/2}, ${h/2})`);
+
+      const scale = d3.scaleLinear().domain([20,80]).range([16, 72 * (w<520?0.7:1)]);
+      const visible = WORDS.filter(d=>activeCats.has(d.cat));
+      layout = d3.layout.cloud()
+        .size([w, h])
+        .words(visible.map(d => ({...d, size: Math.round(scale(d.weight))})))
+        .padding(2)
+        .rotate(()=> (Math.random()<0.35 ? 90 : 0))
+        .font('Merriweather')
+        .fontSize(d=>d.size)
+        .on('end', draw);
+      layout.start();
+    }
+
+    function draw(words){
+      const colorByCat = (cat)=> {
+        const s = getComputedStyle(document.documentElement);
+        const map = {policy:'--policy', research:'--research', media:'--media', contro:'--contro'};
+        return s.getPropertyValue(map[cat] || '--brand').trim();
+      };
+
+      const selection = g.selectAll('text')
+        .data(words)
+        .enter().append('text')
+          .attr('text-anchor','middle')
+          .style('font-size', d=>d.size + 'px')
+          .style('font-family','Merriweather,serif')
+          .style('fill', d=> colorByCat(d.cat))
+          .style('cursor','pointer')
+          .attr('transform', d => `translate(${d.x},${d.y}) rotate(${d.rotate})`)
+          .text(d=>d.text)
+          .on('click', function(e,d){ goDeep(this, d); });
+
+      // вхідна анімація
+      selection
+        .style('opacity',0).transition().duration(600)
+        .style('opacity',1);
+    }
+
+    // ------------- Deep link / zoom transition -------------
+    const dTitle = document.getElementById('dTitle');
+    const dKicker = document.getElementById('dKicker');
+    const heroImg = document.getElementById('heroImg');
+    const dChips = document.getElementById('dChips');
+    const dList = document.getElementById('dList');
+
+    const sheet = document.getElementById('sheet');
+    const closeSheet = document.getElementById('closeSheet');
+    const mTitle = document.getElementById('mTitle');
+    const mChips = document.getElementById('mChips');
+    const mList = document.getElementById('mList');
+    const flip = document.getElementById('flip');
+
+    function goDeep(node, d){
+      const sec = SECTIONS[d.slug] || {title:d.text, img:'https://placehold.co/1200x800?text=Section', tags:[], blocks:[]};
+      const rect = node.getBoundingClientRect();
+      // ghost для zoom-анімації
+      const ghost = document.createElement('div');
+      ghost.className = 'zoomGhost';
+      ghost.textContent = d.text;
+      ghost.style.font = getComputedStyle(node).font;
+      ghost.style.color = getComputedStyle(node).color;
+      ghost.style.left = rect.left + 'px';
+      ghost.style.top = rect.top + 'px';
+      ghost.style.transform = 'translate(0,0) scale(1)';
+      ghost.style.opacity = '1';
+      document.body.appendChild(ghost);
+      const target = document.querySelector('#details').getBoundingClientRect();
+      const tx = target.left + 16 - rect.left;
+      const ty = target.top + 16 - rect.top;
+      ghost.animate([
+        { transform:'translate(0,0) scale(1)', opacity:1 },
+        { transform:`translate(${tx}px, ${ty}px) scale(${Math.min(1.6, target.width/rect.width)})`, opacity:0 }
+      ], {duration:550, easing:'cubic-bezier(.2,.8,.2,1)'}).onfinish = ()=> ghost.remove();
+
+      // оновлюємо панель (desktop)
+      dTitle.textContent = sec.title;
+      dKicker.textContent = 'Вибраний розділ: ' + (CATS[d.cat]?.name || '');
+      heroImg.style.backgroundImage = `url('${sec.img}')`;
+      dChips.innerHTML = (sec.tags||[]).map(t=> `<span class="chip">#${t}</span>`).join('');
+      dList.innerHTML = (sec.blocks||[]).map(b=> `<div class="item"><strong>${b.title}</strong><div>${b.text}</div></div>`).join('');
+      history.pushState({slug:d.slug}, '', '#'+d.slug);
+
+      // mobile: відкриваємо sheet
+      if(window.matchMedia('(max-width: 980px)').matches){
+        mTitle.textContent = sec.title;
+        mChips.innerHTML = dChips.innerHTML;
+        mList.innerHTML = dList.innerHTML;
+        sheet.classList.add('open');
+        // flip reset
+        flip.classList.remove('flipped');
+      }
+    }
+
+    closeSheet.onclick = ()=> sheet.classList.remove('open');
+    flip.onclick = ()=> flip.classList.toggle('flipped');
+    heroImg.onclick = ()=> heroImg.style.transform = heroImg.style.transform ? '' : 'scale(1.05)';
+
+    window.addEventListener('popstate', ()=>{
+      const slug = (location.hash||'').replace('#','');
+      if(slug && SECTIONS[slug]){
+        // якщо прийшли по прямому лінку — просто намалюємо контент
+        const fake = {slug, cat:Object.keys(CATS)[0], text:SECTIONS[slug].title};
+        goDeep(document.querySelector('#cloudSvg'), fake);
+      }
+    });
+
+    // ------------- Chat widget (calls /api/chat) -------------
+    const chatBtn = document.getElementById('chatBtn');
+    const chatBox = document.getElementById('chatBox');
+    const chatClose = document.getElementById('chatClose');
+    const chatBody = document.getElementById('chatBody');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    let thread = [{role:'assistant', content:'Привіт! Пояснити як працює сайт або розповісти про розділ?'}];
+
+    chatBtn.onclick = ()=> chatBox.classList.toggle('open');
+    chatClose.onclick = ()=> chatBox.classList.remove('open');
+
+    chatForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if(!text) return;
+      chatInput.value = '';
+      addMsg('user', text);
+      thread.push({role:'user', content:text});
+      const ctx = currentContext();
+      addMsg('assistant', '… друкую відповідь', true);
+      try{
+        const res = await fetch('/api/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({messages: thread.slice(-10), context: ctx})
+        });
+        const data = await res.json();
+        removeTyping();
+        const reply = data?.reply?.content || 'Сталася помилка на сервері.';
+        addMsg('assistant', reply);
+        thread.push({role:'assistant', content:reply});
+      }catch(err){
+        removeTyping();
+        addMsg('assistant', 'Вибач, не вдалося підключитися до чату.');
+      }
+    });
+
+    function addMsg(role, text, typing=false){
+      const div = document.createElement('div');
+      div.className = 'msg ' + (role==='user'?'me':'ai') + (typing?' typing':'');
+      div.textContent = text;
+      chatBody.appendChild(div);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+    function removeTyping(){
+      const t = chatBody.querySelector('.typing');
+      if(t) t.remove();
+    }
+    function currentContext(){
+      // Передаємо частинку контенту розділу для кращих відповідей
+      const title = document.getElementById('dTitle').textContent;
+      const blocks = [...document.querySelectorAll('#dList .item')].map(x=>x.innerText).join('\n— ');
+      return `Розділ: ${title}\nПункти:\n— ${blocks}`;
+    }
+
+    // ------------- Init -------------
+    window.addEventListener('resize', debounce(redrawCloud, 200));
+    function debounce(fn,ms){ let t; return (...a)=>{clearTimeout(t); t=setTimeout(()=>fn(...a),ms)}}
+    redrawCloud();
+
+  </script>
+</body>
+</html>
